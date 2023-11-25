@@ -17,7 +17,7 @@ export const findOneByUsernameorEmail = async (
   userService: UserService,
 ): Promise<User> => {
   if (emailOrUsername.includes('@')) {
-    if (isEmail(emailOrUsername)) {
+    if (!isEmail(emailOrUsername)) {
       throw new BadRequestException('Invalid email');
     }
     return userService.findOneByEmail(emailOrUsername);
