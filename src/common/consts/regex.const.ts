@@ -7,3 +7,6 @@ export const NAME_REGEX = /(^[\p{L}\d'\.\s\-]*$)/u;
 
 // checks if a string is a valid slug, useful for usernames
 export const SLUG_REGEX = /^[a-z\d]+(?:(\.|-|_)[a-z\d]+)*$/;
+
+export const UUID_REGEX =
+  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;

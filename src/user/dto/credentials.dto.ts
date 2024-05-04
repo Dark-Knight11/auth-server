@@ -1,10 +1,8 @@
 import { IsString, Matches, MinLength } from 'class-validator';
 import { PASSWORD_REGEX } from 'src/common/consts/regex.const';
+import { PasswordDto } from './password.dto';
 
-export class CredentialsDto {
-  @IsString()
-  password: string;
-
+export class CredentialsDto extends PasswordDto {
   @IsString()
   @MinLength(8)
   @Matches(PASSWORD_REGEX, {

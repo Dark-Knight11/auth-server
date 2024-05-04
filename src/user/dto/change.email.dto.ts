@@ -1,17 +1,17 @@
-import { IsEmail, IsString, Length, Matches, MinLength } from 'class-validator';
-import { PASSWORD_REGEX } from '../../common/consts/regex.const';
+import { IsEmail, IsString, IsUUID, Length, Matches, MinLength } from 'class-validator';
+import { PasswordDto } from './password.dto';
+import { ApiProperty } from '@nestjs/swagger';
 
-export class ChangeEmailDto {
+export class ChangeEmailDto extends PasswordDto {
+  @ApiProperty({
+    description: 'The email of the user',
+    example: 'someone@gmail.com',
+    minLength: 5,
+    maxLength: 255,
+    type: String,
+  })
   @IsString()
   @IsEmail()
   @Length(5, 255)
-  email!: string;
-
-  @IsString()
-  @MinLength(8)
-  @Matches(PASSWORD_REGEX, {
-    message:
-      'Password must have at least one uppercase letter and a number or special character',
-  })
-  password!: string;
+  email: string;
 }

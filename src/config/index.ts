@@ -5,10 +5,10 @@ import { redisUrlParser } from 'src/config/utils/redis-url-parser.util';
 
 /**
  * Retrieves the configuration settings for the application.
- * 
+ *
  * @returns {IConfig} The configuration object.
  */
-export function config(): IConfig {
+export const config = (): IConfig => {
   const publicKey = readFileSync(
     join(__dirname, '..', '..', 'keys/public.key'),
     'utf-8',
@@ -50,5 +50,12 @@ export function config(): IConfig {
       },
     },
     redis: redisUrlParser(process.env.REDIS_URL),
+    throttler: {
+      ttl: parseInt(process.env.THROTTLE_TTL, 10),
+      limit: parseInt(process.env.THROTTLE_LIMIT, 10),
+    },
   };
-}
+};
+
+export * from './cache.config';
+export * from './throttler.config';

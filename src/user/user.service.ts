@@ -11,12 +11,18 @@ import {
   updatePassword,
   updateVersion,
 } from './utils';
-import { UserUpdateDto, ChangeEmailDto, CredentialsDto } from './dto';
+import {
+  UserUpdateDto,
+  ChangeEmailDto,
+  CredentialsDto,
+  PasswordDto,
+} from './dto';
 import { CommonService } from 'src/common/common.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { User } from '@prisma/client';
 import * as argon from 'argon2';
 import dayjs from 'dayjs';
+import { SLUG_REGEX, UUID_REGEX } from 'src/common/consts/regex.const';
 
 /**
  * Service responsible for handling user-related operations.
@@ -166,6 +172,32 @@ export class UserService {
   }
 
   /**
+   * Finds a user by their ID or username.
+   * If the provided value is a valid UUID, it searches for a user by ID.
+   * If the provided value is a valid username, it searches for a user by username.
+   *
+   * @param idOrUsername - The ID or username of the user to find.
+   * @returns A Promise that resolves to the found user.
+   * @throws BadRequestException if the provided value is invalid.
+   */
+  async findOneByIdOrUsername(idOrUsername: string) {
+    // check if idOrUsername is a valid uuid
+    if (idOrUsername.length === 36 && UUID_REGEX.test(idOrUsername)) {
+      return this.findOneById(idOrUsername);
+    }
+
+    if (
+      idOrUsername.length < 3 ||
+      idOrUsername.length > 106 ||
+      !SLUG_REGEX.test(idOrUsername)
+    ) {
+      throw new BadRequestException('Invalid username');
+    }
+
+    return this.findOneByUsername(idOrUsername);
+  }
+
+  /**
    * Retrieves a user by email without performing any checks.
    *
    * @param email - The email of the user.
@@ -180,6 +212,29 @@ export class UserService {
     } catch (error) {
       throw new UnauthorizedException('Invalid credentials');
     }
+  }
+
+  /**
+   * Confirms the email for a user.
+   *
+   * @param userId - The ID of the user.
+   * @param version - The version of the user's credentials.
+   * @returns A Promise that resolves to the updated User object.
+   * @throws BadRequestException if the email is already confirmed.
+   */
+  async confirmEmail(userId: string, version: number): Promise<User> {
+    const user = await this.findOnebyCredentials(userId, version);
+
+    if (user.confirmed) {
+      throw new BadRequestException('Email already confirmed');
+    }
+
+    user.credentials = updateVersion(user);
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { confirmed: true, credentials: user.credentials },
+    });
+    return user;
   }
 
   /**
@@ -322,10 +377,15 @@ export class UserService {
    * Removes a user by their ID.
    *
    * @param userId - The ID of the user to remove.
+   * @param dto - The password DTO containing the user's password.
    * @returns A message indicating the success of the operation.
-   * @throws BadRequestException if there is an error deleting the user.
+   * @throws BadRequestException if there is an error deleting the user or if the password is invalid.
    */
-  async remove(userId: string) {
+  async delete(userId: string, dto: PasswordDto) {
+    const user = await this.findOneById(userId);
+    if (!(await argon.verify(user.password, dto.password))) {
+      throw new BadRequestException('Invalid password');
+    }
     try {
       const res = await this.prisma.user.delete({ where: { id: userId } });
       if (!res) {

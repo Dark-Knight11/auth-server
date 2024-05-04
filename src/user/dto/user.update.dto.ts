@@ -1,4 +1,4 @@
-import { IsString, Length, Matches, ValidateIf } from 'class-validator';
+import { IsString, Length, Matches } from 'class-validator';
 import { NAME_REGEX, SLUG_REGEX } from '../../common/consts/regex.const';
 
 export abstract class UserUpdateDto {

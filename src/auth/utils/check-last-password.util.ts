@@ -2,6 +2,7 @@ import { UnauthorizedException } from '@nestjs/common';
 import { Credentials } from '../interfaces';
 import * as argon from 'argon2';
 import dayjs from 'dayjs';
+const debug = require('debug')('app:check-last-password.util');
 
 /**
  * Checks if the provided password matches the last password in the credentials object.
@@ -19,6 +20,7 @@ export const checkLastPassword = async (
     lastPassword.length === 0 ||
     !(await argon.verify(lastPassword, password))
   ) {
+    debug('Invalid credentials');
     throw new UnauthorizedException('Invalid credentials');
   }
   const now = dayjs();

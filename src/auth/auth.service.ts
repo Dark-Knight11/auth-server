@@ -2,6 +2,8 @@ import {
   BadRequestException,
   Inject,
   Injectable,
+  Logger,
+  LoggerService,
   UnauthorizedException,
 } from '@nestjs/common';
 import { CommonService } from 'src/common/common.service';
@@ -14,6 +16,7 @@ import {
   EmailDto,
   ResetPasswordDto,
   ChangePasswordDto,
+  ConfirmEmailDto,
 } from './dtos';
 import {
   blacklistToken,
@@ -30,12 +33,14 @@ import { IRefreshToken, IEmailToken } from 'src/jwt/interface';
 import { IMessage } from 'src/common/interfaces/message.interface';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
+const debug = require('debug')('app:auth.service');
 
 /**
  * Service responsible for handling authentication-related operations.
-*/
+ */
 @Injectable()
 export class AuthService {
+  private readonly loggerService: LoggerService;
   constructor(
     @Inject(CACHE_MANAGER)
     private readonly cacheManager: Cache,
@@ -43,7 +48,9 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly mailerService: MailerService,
     private readonly commonService: CommonService,
-  ) {}
+  ) {
+    this.loggerService = new Logger(AuthService.name);
+  }
 
   /**
    * Creates a new user in the database and sends a confirmation email.
@@ -66,12 +73,14 @@ export class AuthService {
       );
       this.mailerService.sendConfirmationMail(user, confirmationToken);
       return this.commonService.generateMessage(
-        'Registration Successful.\nCheck your email to confirm your account.',
+        'Registration Successful. Check your email to confirm your account.',
       );
     } catch (error) {
       if (error.code === 'P2002') {
+        this.loggerService.error(error);
         throw new UnauthorizedException('Email already in use');
       }
+      this.loggerService.error(error);
       throw new BadRequestException('Registration failed');
     }
   }
@@ -104,6 +113,7 @@ export class AuthService {
         domain,
       );
       this.mailerService.sendConfirmationMail(user, confirmationToken);
+      debug(`User ${user.id} is not confirmed. Confirmation email sent.`);
       throw new UnauthorizedException(
         'Please confirm your email to continue. Confirmation email has been sent.',
       );
@@ -167,6 +177,32 @@ export class AuthService {
   }
 
   /**
+   * Confirms the email address of a user.
+   * 
+   * @param dto - The ConfirmEmailDto object containing the confirmation token.
+   * @param domain - Optional domain for generating the authentication tokens.
+   * @throws UnauthorizedException - If the confirmation token is invalid.
+   * @returns A Promise that resolves to an IAuthResult object containing the user, access token, and refresh token.
+   */
+  async confirmEmail(
+    dto: ConfirmEmailDto,
+    domain?: string,
+  ): Promise<IAuthResult> {
+    const { confirmationToken } = dto;
+    const { id, version } = await this.jwtService.verifyToken<IEmailToken>(
+      confirmationToken,
+      TokenType.CONFIRMATION,
+    );
+    const user = await this.userService.confirmEmail(id, version);
+    const [accessToken, refreshToken] = await generateAuthTokens(
+      user,
+      this.jwtService,
+      domain,
+    );
+    return { user, accessToken, refreshToken };
+  }
+
+  /**
    * Sends a reset password email to the user.
    *
    * @param dto - The email DTO containing the recipient's email address.
@@ -214,9 +250,10 @@ export class AuthService {
    * @throws BadRequestException - If the passwords do not match.
    * @returns A promise that resolves to an object containing the updated user, access token, and refresh token.
    */
-  async changePasssword(
+  async changePassword(
     userId: string,
     dto: ChangePasswordDto,
+    origin?: string,
   ): Promise<IAuthResult> {
     const { password1, password2, oldPassword } = dto;
     comparePasswords(password1, password2);
